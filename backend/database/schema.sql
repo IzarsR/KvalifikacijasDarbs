@@ -1,0 +1,11 @@
+
+CREATE DATABASE IF NOT EXISTS playlytic;
+USE playlytic;
+CREATE TABLE IF NOT EXISTS videos (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO videos (title) VALUES 
+  ('Sample Video 1'),
+  ('Sample Video 2');

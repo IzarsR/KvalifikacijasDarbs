@@ -1,0 +1,16 @@
+.App {
+  min-height: 100vh;
+  max-height: 100vh;
+  background-color: white;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.container {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
