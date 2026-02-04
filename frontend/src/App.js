@@ -4,6 +4,7 @@ import Navigation from './components/Navigation';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Videos from './pages/Videos';
+import Login from './pages/Login';
 import './App.css';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/videos" element={<Videos />} />
+            <Route path="/login" element={<Login />} />
           </Routes>
         </div>
       </div>

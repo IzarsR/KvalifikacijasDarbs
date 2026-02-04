@@ -9,7 +9,7 @@ function Navigation() {
         <div className="nav-logo">Playlytic</div>
         <ul className="nav-links">
           <li><Link to="/">Home</Link></li>
-          <li><a href="#login">Login</a></li>
+          <li><Link to="/login">Login</Link></li>
           <li><a href="#signup">Sign Up</a></li>
         </ul>
       </div>
