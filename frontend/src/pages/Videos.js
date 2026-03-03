@@ -9,7 +9,6 @@ function Videos() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Fetch videos on component mount
   useEffect(() => {
     fetchVideos();
   }, []);
@@ -48,7 +47,7 @@ function Videos() {
       if (response.ok) {
         setMessage('Video added successfully!');
         setNewVideoTitle('');
-        fetchVideos(); // Refresh the list
+        fetchVideos();
       } else {
         setMessage('Failed to add video');
       }

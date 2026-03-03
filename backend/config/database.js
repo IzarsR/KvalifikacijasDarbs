@@ -1,6 +1,5 @@
 const mysql = require('mysql2');
 
-// Create connection pool
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
@@ -12,7 +11,6 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Get promise-based connection
 const promisePool = pool.promise();
 
 module.exports = promisePool;
