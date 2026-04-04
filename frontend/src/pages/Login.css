@@ -144,3 +144,9 @@
   margin-top: 4px;
   display: block;
 }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 480px) {
+  .auth-page { padding: 24px 12px; align-items: flex-start; }
+  .auth-box { padding: 32px 20px; border-radius: 8px; }
+}
