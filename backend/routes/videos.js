@@ -1,31 +1,41 @@
 const express = require('express');
+const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const multer = require('multer');
+const ffmpeg = require('fluent-ffmpeg');
 
 const router = express.Router();
 const db = require('../config/database');
 const requireAuth = require('../middleware/auth');
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-fs.mkdirSync(uploadsDir, { recursive: true });
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
+// Ensure clips directory exists
+const clipsDir = path.join(__dirname, '../uploads/clips');
+if (!fs.existsSync(clipsDir)) {
+  fs.mkdirSync(clipsDir, { recursive: true });
+}
+
+// Multer configuration for local file storage
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const baseName = path.basename(file.originalname, path.extname(file.originalname))
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 40) || 'video';
-    const ext = (path.extname(file.originalname || '') || '.mp4').toLowerCase();
-    cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${baseName}${ext}`);
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    const ext = path.extname(file.originalname);
+    cb(null, `${timestamp}_${random}${ext}`);
   },
 });
 
+// Multer configuration for local file storage
 const upload = multer({
-  storage,
-  limits: { fileSize: 500 * 1024 * 1024 },
+  storage: storage,
   fileFilter: (_req, file, cb) => {
     if (!file.mimetype || !file.mimetype.startsWith('video/')) {
       cb(new Error('Only video files are allowed.'));
@@ -73,6 +83,7 @@ async function ensureSchema() {
       session_id VARCHAR(255) NULL,
       title VARCHAR(255) NOT NULL,
       url TEXT NULL,
+      filename VARCHAR(255) NULL,
       source_type VARCHAR(30) NOT NULL DEFAULT 'url',
       original_filename VARCHAR(255) NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -83,6 +94,7 @@ async function ensureSchema() {
   await addColumnIfMissing('ALTER TABLE videos ADD COLUMN user_id INT NULL');
   await addColumnIfMissing('ALTER TABLE videos ADD COLUMN session_id VARCHAR(255) NULL');
   await addColumnIfMissing('ALTER TABLE videos ADD COLUMN url TEXT NULL');
+  await addColumnIfMissing('ALTER TABLE videos ADD COLUMN filename VARCHAR(255) NULL');
   await addColumnIfMissing("ALTER TABLE videos ADD COLUMN source_type VARCHAR(30) NOT NULL DEFAULT 'url'");
   await addColumnIfMissing('ALTER TABLE videos ADD COLUMN original_filename VARCHAR(255) NULL');
   await addColumnIfMissing('ALTER TABLE videos ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
@@ -98,6 +110,7 @@ async function ensureSchema() {
       label VARCHAR(255) NOT NULL,
       start_time DECIMAL(10,3) NOT NULL,
       end_time DECIMAL(10,3) NOT NULL,
+      file_path VARCHAR(500),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -106,29 +119,6 @@ async function ensureSchema() {
   await addIndexIfMissing('CREATE INDEX idx_clips_video ON clips (video_id)');
 
   schemaReady = true;
-}
-
-function toUploadPath(url) {
-  if (!url || typeof url !== 'string') return null;
-
-  try {
-    const parsed = new URL(url);
-    const decoded = decodeURIComponent(parsed.pathname || '');
-    if (!decoded.startsWith('/uploads/')) return null;
-    return path.join(uploadsDir, path.basename(decoded));
-  } catch {
-    if (!url.startsWith('/uploads/')) return null;
-    return path.join(uploadsDir, path.basename(url));
-  }
-}
-
-function removeFileIfExists(filePath) {
-  if (!filePath) return;
-  fs.unlink(filePath, () => {});
-}
-
-function getPublicUploadUrl(req, fileName) {
-  return `${req.protocol}://${req.get('host')}/uploads/${encodeURIComponent(fileName)}`;
 }
 
 function formatVideoRow(row) {
@@ -147,16 +137,40 @@ function formatVideoRow(row) {
 
 async function removeSessionVideo(sessionId, userId) {
   const [[existing]] = await db.query(
-    'SELECT id, url, source_type FROM videos WHERE session_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1',
+    'SELECT id, filename FROM videos WHERE session_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1',
     [sessionId, userId]
   );
 
   await db.query('DELETE FROM clips WHERE session_id = ? AND user_id = ?', [sessionId, userId]);
   await db.query('DELETE FROM videos WHERE session_id = ? AND user_id = ?', [sessionId, userId]);
 
-  if (existing && existing.source_type === 'upload') {
-    removeFileIfExists(toUploadPath(existing.url));
+  // Delete file from disk if it exists
+  if (existing && existing.filename) {
+    const filePath = path.join(uploadsDir, existing.filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
   }
+}
+
+// Helper function to extract a clip from a video
+function extractClip(inputPath, outputPath, startTime, endTime) {
+  return new Promise((resolve, reject) => {
+    const duration = Math.max(0, endTime - startTime);
+    
+    ffmpeg(inputPath)
+      .setStartTime(startTime)
+      .duration(duration)
+      .output(outputPath)
+      .outputOptions('-c:v copy', '-c:a copy') // Copy streams without re-encoding for speed
+      .on('end', () => {
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        reject(err);
+      })
+      .run();
+  });
 }
 
 router.get('/session/:sessionId', requireAuth, async (req, res) => {
@@ -209,7 +223,6 @@ router.post('/session/upload', requireAuth, uploadVideoMiddleware, async (req, r
 
     const { session_id, title } = req.body;
     if (!session_id) {
-      if (req.file) removeFileIfExists(path.join(uploadsDir, req.file.filename));
       return res.status(400).json({ error: 'session_id is required.' });
     }
     if (!req.file) {
@@ -218,20 +231,24 @@ router.post('/session/upload', requireAuth, uploadVideoMiddleware, async (req, r
 
     await removeSessionVideo(String(session_id), req.user.userId);
 
-    const fileUrl = getPublicUploadUrl(req, req.file.filename);
-    const cleanTitle = String(title || req.file.originalname || 'Uploaded Video').trim().slice(0, 255) || 'Uploaded Video';
+    const fileSizeMB = (req.file.size / 1024 / 1024).toFixed(2);
+    console.log(`Video uploaded: ${req.file.filename} (${fileSizeMB}MB)`);
 
-    const [result] = await db.query(
-      'INSERT INTO videos (user_id, session_id, title, url, source_type, original_filename) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.user.userId, String(session_id), cleanTitle, fileUrl, 'upload', req.file.originalname]
+    const cleanTitle = String(title || req.file.originalname || 'Uploaded Video').trim().slice(0, 255) || 'Uploaded Video';
+    
+    // Local file URL
+    const videoUrl = `/uploads/${req.file.filename}`;
+
+    const [insertResult] = await db.query(
+      'INSERT INTO videos (user_id, session_id, title, url, filename, source_type, original_filename) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.user.userId, String(session_id), cleanTitle, videoUrl, req.file.filename, 'upload', req.file.originalname]
     );
 
-    const [[created]] = await db.query('SELECT * FROM videos WHERE id = ?', [result.insertId]);
-    res.status(201).json({ video: formatVideoRow(created), message: 'Video uploaded.' });
+    const [[created]] = await db.query('SELECT * FROM videos WHERE id = ?', [insertResult.insertId]);
+    res.status(201).json({ video: formatVideoRow(created), message: 'Video uploaded successfully.' });
   } catch (error) {
-    if (req.file) removeFileIfExists(path.join(uploadsDir, req.file.filename));
-    console.error('Error uploading session video:', error);
-    res.status(500).json({ error: 'Failed to upload video.' });
+    console.error('Error uploading session video:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to upload video.' });
   }
 });
 
@@ -250,7 +267,7 @@ router.get('/session/:sessionId/clips', requireAuth, async (req, res) => {
   try {
     await ensureSchema();
     const [clips] = await db.query(
-      'SELECT id, label, start_time, end_time, created_at FROM clips WHERE session_id = ? AND user_id = ? ORDER BY start_time ASC, created_at ASC',
+      'SELECT id, label, start_time, end_time, file_path, created_at FROM clips WHERE session_id = ? AND user_id = ? ORDER BY start_time ASC, created_at ASC',
       [req.params.sessionId, req.user.userId]
     );
     res.json(clips);
@@ -278,21 +295,37 @@ router.post('/session/:sessionId/clips', requireAuth, async (req, res) => {
 
     const sessionId = String(req.params.sessionId);
     const [[video]] = await db.query(
-      'SELECT id FROM videos WHERE session_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1',
+      'SELECT id, filename FROM videos WHERE session_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1',
       [sessionId, req.user.userId]
     );
 
-    if (!video) {
+    if (!video || !video.filename) {
       return res.status(400).json({ error: 'Add a video to this session before creating clips.' });
     }
 
+    // Extract the clip using FFmpeg
+    const inputPath = path.join(uploadsDir, video.filename);
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    const clipFilename = `clip_${timestamp}_${random}.mp4`;
+    const outputPath = path.join(clipsDir, clipFilename);
+
+    try {
+      await extractClip(inputPath, outputPath, start, end);
+    } catch (ffmpegError) {
+      console.error('FFmpeg extraction error:', ffmpegError);
+      return res.status(500).json({ error: 'Failed to extract clip. Please ensure FFmpeg is installed.' });
+    }
+
+    // Store clip metadata in database with file path
+    const clipPath = `/uploads/clips/${clipFilename}`;
     const [result] = await db.query(
-      'INSERT INTO clips (video_id, user_id, session_id, label, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?)',
-      [video.id, req.user.userId, sessionId, clipLabel, start, end]
+      'INSERT INTO clips (video_id, user_id, session_id, label, start_time, end_time, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [video.id, req.user.userId, sessionId, clipLabel, start, end, clipPath]
     );
 
     const [[created]] = await db.query(
-      'SELECT id, label, start_time, end_time, created_at FROM clips WHERE id = ?',
+      'SELECT id, label, start_time, end_time, file_path, created_at FROM clips WHERE id = ?',
       [result.insertId]
     );
 
@@ -306,13 +339,34 @@ router.post('/session/:sessionId/clips', requireAuth, async (req, res) => {
 router.delete('/clips/:clipId', requireAuth, async (req, res) => {
   try {
     await ensureSchema();
+    
+    // Get clip details before deleting
+    const [[clip]] = await db.query(
+      'SELECT file_path FROM clips WHERE id = ? AND user_id = ?',
+      [req.params.clipId, req.user.userId]
+    );
+
+    if (!clip) {
+      return res.status(404).json({ error: 'Clip not found.' });
+    }
+
+    // Delete from database
     const [result] = await db.query(
       'DELETE FROM clips WHERE id = ? AND user_id = ?',
       [req.params.clipId, req.user.userId]
     );
 
-    if (!result.affectedRows) {
-      return res.status(404).json({ error: 'Clip not found.' });
+    // Delete file from disk if it exists
+    if (clip.file_path) {
+      const filename = path.basename(clip.file_path);
+      const filePath = path.join(clipsDir, filename);
+      if (fs.existsSync(filePath)) {
+        try {
+          fs.unlinkSync(filePath);
+        } catch (fileError) {
+          console.error('Error deleting clip file:', fileError);
+        }
+      }
     }
 
     res.json({ message: 'Clip removed.' });

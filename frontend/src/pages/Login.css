@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(100vh - 65px);
+  min-height: calc(100vh - 85px);
   background: #0a0a0f;
   padding: 40px 16px;
 }
@@ -84,19 +84,41 @@
 .auth-field input:focus { border-color: #e63946; }
 
 .auth-btn {
+  --b: 2px;
+  --s: .35em;
+  --color: #e63946;
+  
   margin-top: 4px;
-  padding: 13px;
-  background: #e63946;
+  padding: calc(.6em + var(--s)) calc(1em + var(--s));
+  background:
+    conic-gradient(from 90deg at var(--b) var(--b),#0000 90deg,var(--color) 0)
+    var(--_p) var(--_p)/calc(100% - var(--b) - 2*var(--_p)) calc(100% - var(--b) - 2*var(--_p));
+  --_p: var(--s);
   border: none;
-  border-radius: 7px;
   color: #fff;
   font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: .3s linear, color 0s, background-color 0s;
+  outline: var(--b) solid #0000;
+  outline-offset: .6em;
   width: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
 }
-.auth-btn:hover { background: #c1121f; }
+
+.auth-btn:hover,
+.auth-btn:focus-visible {
+  --_p: 0px;
+  outline-color: var(--color);
+  outline-offset: .05em;
+}
+
+.auth-btn:active {
+  background: var(--color);
+  color: #fff;
+}
 
 .auth-switch {
   text-align: center;

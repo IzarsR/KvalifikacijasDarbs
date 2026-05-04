@@ -168,16 +168,19 @@ function formatTime(seconds) {
 }
 
 function normalizeClip(raw, idx) {
-  const start = Number(raw?.start);
-  const end = Number(raw?.end);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
+  let filePath = String(raw?.file_path || '');
+  // If file path is relative, prepend the API domain
+  if (filePath && filePath.startsWith('/')) {
+    filePath = 'http://localhost:5000' + filePath;
+  }
 
   return {
     id: raw?.id || `local-${Date.now()}-${idx}`,
-    dbId: Number.isFinite(Number(raw?.dbId)) ? Number(raw.dbId) : null,
+    dbId: Number.isFinite(Number(raw?.id)) ? Number(raw.id) : null,
     label: String(raw?.label || `Clip ${idx + 1}`),
-    start: Number(start.toFixed(2)),
-    end: Number(end.toFixed(2)),
+    start: raw?.start_time ? Number(raw.start_time.toFixed(2)) : null,
+    end: raw?.end_time ? Number(raw.end_time.toFixed(2)) : null,
+    filePath: filePath,
   };
 }
 
@@ -186,10 +189,16 @@ function normalizeSession(raw) {
     ? raw.clips.map((clip, idx) => normalizeClip(clip, idx)).filter(Boolean).sort(sortClips)
     : [];
 
+  let videoUrl = String(raw?.videoUrl || '');
+  // If URL is relative (local upload), prepend the API domain
+  if (videoUrl.startsWith('/')) {
+    videoUrl = 'http://localhost:5000' + videoUrl;
+  }
+
   return {
     id: raw?.id,
     name: String(raw?.name || 'Untitled session'),
-    videoUrl: String(raw?.videoUrl || ''),
+    videoUrl: videoUrl,
     videoSourceType: raw?.videoSourceType === 'upload' ? 'upload' : 'url',
     clips,
   };
@@ -322,9 +331,14 @@ function Dashboard() {
 
     try {
       const response = await saveVideoToDB(activeId, trimmed, token);
+      let responseUrl = response?.video?.url || trimmed;
+      // If URL is relative (local upload), prepend the API domain
+      if (responseUrl.startsWith('/')) {
+        responseUrl = 'http://localhost:5000' + responseUrl;
+      }
       updateActiveSession((session) => ({
         ...session,
-        videoUrl: response?.video?.url || trimmed,
+        videoUrl: responseUrl,
         videoSourceType: response?.video?.source_type || 'url',
       }));
       setVideoStatus('Video URL saved.');
@@ -344,7 +358,12 @@ function Dashboard() {
 
     try {
       const data = await uploadVideoToDB(activeId, file, token);
-      const uploadedUrl = data?.video?.url || '';
+      let uploadedUrl = data?.video?.url || '';
+      
+      // If URL is relative (local upload), prepend the API domain
+      if (uploadedUrl.startsWith('/')) {
+        uploadedUrl = 'http://localhost:5000' + uploadedUrl;
+      }
 
       updateActiveSession((session) => ({
         ...session,
@@ -537,7 +556,12 @@ function Dashboard() {
           const merged = { ...session };
 
           if (!merged.videoUrl && videoPayload?.video?.url) {
-            merged.videoUrl = videoPayload.video.url;
+            let videoUrl = videoPayload.video.url;
+            // If URL is relative (local upload), prepend the API domain
+            if (videoUrl.startsWith('/')) {
+              videoUrl = 'http://localhost:5000' + videoUrl;
+            }
+            merged.videoUrl = videoUrl;
             merged.videoSourceType = videoPayload.video.source_type || 'url';
           }
 
@@ -717,6 +741,7 @@ function Dashboard() {
                           ref={videoRef}
                           className="db-video-player"
                           controls
+                          crossOrigin="anonymous"
                           src={directUrl}
                           onTimeUpdate={() => {
                             if (!videoRef.current) return;
@@ -725,6 +750,10 @@ function Dashboard() {
                           onLoadedMetadata={() => {
                             if (!videoRef.current) return;
                             setVideoDuration(videoRef.current.duration || 0);
+                          }}
+                          onError={(e) => {
+                            console.error('Video error:', e);
+                            setVideoError('Video failed to load. Check console for details.');
                           }}
                         />
                       )}
@@ -840,14 +869,28 @@ function Dashboard() {
                     ) : (
                       activeSession.clips.map((clip) => (
                         <div key={clip.id} className="db-clip-card">
-                          <div className="db-card-top">
-                             <span className="db-card-time">{formatTime(clip.start)} - {formatTime(clip.end)}</span>
-                             <div className="db-card-actions">
-                                <button type="button" onClick={() => handleJumpToClip(clip.start)}>Jump</button>
-                                <button type="button" onClick={() => handleDeleteClip(clip.id, clip.dbId)}>Del</button>
-                             </div>
+                          <div className="db-card-header">
+                            <span className="db-card-label">{clip.label}</span>
+                            <div className="db-card-actions">
+                              {clip.filePath && (
+                                <button type="button" onClick={() => window.open(clip.filePath, '_blank')}>Play</button>
+                              )}
+                              <button type="button" onClick={() => handleDeleteClip(clip.id, clip.dbId)}>Del</button>
+                            </div>
                           </div>
-                          <div className="db-card-label">{clip.label}</div>
+                          {clip.filePath && (
+                            <div className="db-card-video-preview">
+                              <video width="100%" height="120" controls style={{ borderRadius: '6px', marginTop: '8px' }}>
+                                <source src={clip.filePath} type="video/mp4" />
+                                Your browser does not support the video tag.
+                              </video>
+                            </div>
+                          )}
+                          {clip.start !== null && clip.end !== null && (
+                            <div className="db-card-time" style={{ fontSize: '12px', marginTop: '6px', opacity: 0.7 }}>
+                              {formatTime(clip.start)} - {formatTime(clip.end)}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}

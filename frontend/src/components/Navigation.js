@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Logo from './Logo';
 import './Navigation.css';
 
 function Navigation() {
@@ -21,7 +22,9 @@ function Navigation() {
   return (
     <nav className="navigation">
       <div className="nav-container">
-        <Link to="/" className="nav-logo" onClick={closeMenu}>Play<span>lytic</span></Link>
+        <Link to="/" className="nav-logo" onClick={closeMenu}>
+          <Logo />
+        </Link>
 
         {/* hamburger button — only visible on mobile */}
         <button

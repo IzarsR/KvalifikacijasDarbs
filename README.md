@@ -1,156 +1,210 @@
-# Playlytic - Progress Version
+# Playlytic
 
-A simple video management web application demonstrating basic CRUD functionality.
+Playlytic is a sports video analysis web app built for qualification work. Users can create accounts, open analysis sessions, attach a video (URL or uploaded file), create clips by time range, and manage all clips per session.
+
+## Tech Stack
+
+- Frontend: React, React Router
+- Backend: Node.js, Express
+- Database: MySQL
+- Auth: JWT + bcrypt
+- Uploads: Multer
 
 ## Project Structure
 
 ```
-KvalifikācijasDarbsRI/
-├── backend/           # Node.js + Express backend
-│   ├── config/       # Database configuration
-│   ├── database/     # SQL schema
-│   ├── routes/       # API routes
-│   ├── server.js     # Main server file
+KvalifikacijasDarbs/
+├── backend/
+│   ├── config/
+│   ├── middleware/
+│   ├── routes/
+│   ├── uploads/
+│   ├── server.js
+│   ├── setup-database.js
 │   └── package.json
-│
-└── frontend/         # React frontend
-    ├── public/       # Static files
-    ├── src/
-    │   ├── components/  # React components
-    │   ├── pages/       # Page components
-    │   ├── App.js
-    │   └── index.js
-    └── package.json
+└── frontend/
+      ├── public/
+      ├── src/
+      │   ├── components/
+      │   ├── context/
+      │   ├── pages/
+      │   ├── App.js
+      │   └── index.js
+      └── package.json
 ```
 
-## Technologies
+## Implemented Features
 
-- **Frontend**: React, React Router
-- **Backend**: Node.js, Express
-- **Database**: MySQL
+- User signup and login with password strength validation
+- Protected dashboard route for authenticated users
+- Session management in dashboard (create, rename, delete)
+- Add video by URL for a session
+- Upload video file for a session
+- Remove session video
+- Clip creation with start/end times
+- Clip listing and deletion
+- Session-level video and clips persisted in MySQL
+- Responsive UI for desktop and mobile
 
-## Setup Instructions
+## Setup Guide
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- MySQL (v5.7 or higher) **OR** XAMPP
-- npm or yarn
 
-### 1. Database Setup
+- Node.js 18+
+- MySQL 5.7+ (or MySQL via XAMPP)
+- npm
 
-#### Option A - Using XAMPP (Easiest for Windows) ⭐
+### 1. Clone and Install
 
-1. **Download and Install XAMPP:**
-   - Download from https://www.apachefriends.org/
-   - Install XAMPP (you only need MySQL, but Apache+phpMyAdmin is useful)
+```bash
+git clone <your-repo-url>
+cd KvalifikacijasDarbs
+cd backend && npm install
+cd ../frontend && npm install
+```
 
-2. **Start MySQL:**
-   - Open XAMPP Control Panel
-   - Click "Start" next to MySQL
-   - Click "Start" next to Apache (optional, for phpMyAdmin)
+### 2. Configure Backend Environment
 
-3. **Create Database using phpMyAdmin:**
-   - Open browser and go to http://localhost/phpmyadmin
-   - Click "SQL" tab at the top
-   - Open `backend/database/schema.sql` in a text editor
-   - Copy all the SQL code
-   - Paste it into the SQL query box
-   - Click "Go" button
-   - Done! The `playlytic` database and `videos` table are now created
+Create a `.env` file in `backend/`:
 
-#### Option B - Using MySQL Workbench
+```env
+PORT=5000
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=playlytic
+DB_PORT=3306
+JWT_SECRET=replace_this_with_a_long_random_secret
+```
 
-1. Open MySQL Workbench
-2. Connect to your local MySQL server
-3. Open `backend/database/schema.sql`
-4. Click the lightning bolt icon to execute the script
+### 3. Initialize Database
 
-#### Option C - Using MySQL Command Line
+Option A (recommended for this project):
 
-1. Open MySQL Command Line Client (search for it in Windows Start menu)
-2. Enter your password when prompted
-3. Copy and paste the contents of `backend/database/schema.sql`
-4. Press Enter to execute
+```bash
+cd backend
+node setup-database.js
+```
 
-### 2. Backend Setup
+Option B:
 
-1. Navigate to the backend folder:
-   ```bash
-   cd backend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Copy `.env.example` to `.env` and update with your MySQL credentials (optional, defaults work for most local setups)
-4. Start the server:
-   ```bash
-   npm start
-   ```
-   The backend will run on http://localhost:5000
+- Manually create database `playlytic` in MySQL
+- Start backend once; required tables are created automatically by route schema checks
 
-### 3. Frontend Setup
+### 4. Run the Application
 
-1. Open a new terminal and navigate to the frontend folder:
-   ```bash
-   cd frontend
-   ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the development server:
-   ```bash
-   npm start
-   ```
-   The frontend will open automatically at http://localhost:3000
+Backend terminal:
 
-## Features
+```bash
+cd backend
+npm start
+```
 
-### Current Implementation
-- ✅ Homepage with "Playlytic" branding
-- ✅ Navigation bar (Home, Videos)
-- ✅ Form to add video titles
-- ✅ Save video titles to MySQL database
-- ✅ Display list of saved videos
-- ✅ Clean and responsive design
+Frontend terminal:
 
-### Future Expansion
-- Video file upload
-- Video processing and cutting
-- User authentication
-- Advanced video management
-- Playlists and categories
+```bash
+cd frontend
+npm start
+```
 
-## API Endpoints
+App URLs:
 
-- `GET /api/videos` - Get all videos
-- `POST /api/videos` - Add a new video (body: `{ "title": "Video Title" }`)
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5000
 
-## Notes
+## API Overview
 
-- This is a basic prototype for demonstration purposes
-- No authentication is implemented yet
-- Video upload and processing features will be added later
-- Database connection uses environment variables (see `.env.example`)
+### Auth
+
+- `POST /api/auth/signup`
+   - Body: `{ username, email, password }`
+   - Returns: `{ token, username }`
+- `POST /api/auth/login`
+   - Body: `{ email, password }`
+   - Returns: `{ token, username }`
+
+### Session Video (requires `Authorization: Bearer <token>`)
+
+- `GET /api/videos/session/:sessionId`
+   - Returns latest video for the session/user
+- `POST /api/videos/session`
+   - Body: `{ session_id, url, title? }`
+   - Saves video URL for session
+- `POST /api/videos/session/upload`
+   - FormData: `session_id`, `title?`, `video`
+   - Uploads video file and saves URL
+- `DELETE /api/videos/session/:sessionId`
+   - Removes session video and related clips
+
+### Clips (requires `Authorization: Bearer <token>`)
+
+- `GET /api/videos/session/:sessionId/clips`
+   - Lists clips for session/user
+- `POST /api/videos/session/:sessionId/clips`
+   - Body: `{ label, start_time, end_time }`
+   - Creates new clip
+- `DELETE /api/videos/clips/:clipId`
+   - Deletes one clip
+
+### Legacy Basic Endpoints
+
+- `GET /api/videos`
+- `POST /api/videos`
+
+These endpoints are kept for backward compatibility with older prototype flow.
+
+## Testing and Final Check
+
+Run before submission:
+
+```bash
+# frontend
+cd frontend
+npm run build
+
+# backend syntax quick check
+cd ../backend
+node --check server.js
+node --check routes/auth.js
+node --check routes/videos.js
+```
+
+Manual flow checklist:
+
+- Signup -> login -> logout
+- Create session, rename session, delete session
+- Add video URL to session
+- Upload video file to session
+- Create clip, jump to clip, delete clip
+
+## Known Limitations
+
+- No automated unit/integration test suite yet
+- Frontend currently uses hardcoded localhost API URLs in page files
+- Uploaded files are stored locally in `backend/uploads`
+- No role-based access (all authenticated users use same feature set)
+- No advanced analytics metrics yet (focus is clip/session workflow)
 
 ## Troubleshooting
 
-**Backend won't start:**
-- Check if MySQL is running
-- Verify database credentials in `.env` file
-- Ensure port 5000 is not in use
+### Backend does not start
 
-**Frontend can't connect to backend:**
-- Make sure backend is running on port 5000
-- Check browser console for CORS errors
-- Verify API_URL in Videos.js points to http://localhost:5000
+- Ensure MySQL is running
+- Verify `backend/.env` DB values
+- Ensure port 5000 is available
 
-**Database errors:**
-- Verify the database exists: `SHOW DATABASES;`
-- Check if tables are created: `USE playlytic; SHOW TABLES;`
-- Re-run the schema.sql file if needed
+### Frontend cannot call backend
+
+- Ensure backend is running on http://localhost:5000
+- Check browser console/network tab for request errors
+- Verify JWT token exists after login
+
+### Upload issues
+
+- Confirm file is a video type
+- Check file size (current limit: 500 MB)
+- Ensure `backend/uploads` can be written
 
 ## License
 
-This is a student project for qualification work.
+Student project for qualification work.
