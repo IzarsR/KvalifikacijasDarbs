@@ -39,4 +39,3 @@ coverage/
 
 # Uploads (large video files)
 backend/uploads/
-frontend/public/images/
