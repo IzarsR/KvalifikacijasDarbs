@@ -1,6 +1,6 @@
 # Playlytic
 
-Playlytic is a sports video analysis web app built for qualification work. Users can create accounts, open analysis sessions, attach a video (URL or uploaded file), create clips by time range, and manage all clips per session.
+Playlytic is a sports video analysis web app built for qualification work. Users can create accounts, open analysis sessions, upload a video file, create clips by time range, and manage all clips per session.
 
 ## Tech Stack
 
@@ -38,7 +38,6 @@ KvalifikacijasDarbs/
 - User signup and login with password strength validation
 - Protected dashboard route for authenticated users
 - Session management in dashboard (create, rename, delete)
-- Add video by URL for a session
 - Upload video file for a session
 - Remove session video
 - Clip creation with start/end times
@@ -127,12 +126,9 @@ App URLs:
 
 - `GET /api/videos/session/:sessionId`
    - Returns latest video for the session/user
-- `POST /api/videos/session`
-   - Body: `{ session_id, url, title? }`
-   - Saves video URL for session
 - `POST /api/videos/session/upload`
    - FormData: `session_id`, `title?`, `video`
-   - Uploads video file and saves URL
+   - Uploads video file and saves the local file path
 - `DELETE /api/videos/session/:sessionId`
    - Removes session video and related clips
 
@@ -173,7 +169,6 @@ Manual flow checklist:
 
 - Signup -> login -> logout
 - Create session, rename session, delete session
-- Add video URL to session
 - Upload video file to session
 - Create clip, jump to clip, delete clip
 

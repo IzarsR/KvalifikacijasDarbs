@@ -230,36 +230,6 @@ router.get('/session/:sessionId', requireAuth, async (req, res) => {
   }
 });
 
-router.post('/session', requireAuth, async (req, res) => {
-  try {
-    await ensureSchema();
-
-    const { title, url, session_id } = req.body;
-    if (!session_id) {
-      return res.status(400).json({ error: 'session_id is required.' });
-    }
-    if (!url || !String(url).trim()) {
-      return res.status(400).json({ error: 'url is required.' });
-    }
-
-    await removeSessionVideo(String(session_id), req.user.userId);
-
-    const cleanUrl = String(url).trim();
-    const cleanTitle = String(title || cleanUrl).trim().slice(0, 255) || 'Session Video';
-
-    const [result] = await db.query(
-      'INSERT INTO videos (user_id, session_id, title, url, source_type, original_filename) VALUES (?, ?, ?, ?, ?, ?)',
-      [req.user.userId, String(session_id), cleanTitle, cleanUrl, 'url', null]
-    );
-
-    const [[created]] = await db.query('SELECT * FROM videos WHERE id = ?', [result.insertId]);
-    res.status(201).json({ video: formatVideoRow(created), message: 'Video saved.' });
-  } catch (error) {
-    console.error('Error saving session video:', error);
-    res.status(500).json({ error: 'Failed to save video.' });
-  }
-});
-
 router.post('/session/upload', requireAuth, uploadVideoMiddleware, async (req, res) => {
   try {
     await ensureSchema();
