@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AUTH_API_URL } from '../config/api';
 import './Login.css';
 
 function Login() {
@@ -16,7 +17,7 @@ function Login() {
     setError('');
     setLoading(true);
     try {
-      const res  = await fetch('http://localhost:5000/api/auth/login', {
+      const res  = await fetch(`${AUTH_API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -38,7 +39,7 @@ function Login() {
   return (
     <div className="auth-page">
       <div className="auth-box">
-        <div className="auth-logo">Play<span>lytic</span></div>
+        <div className="auth-logo">Playlytic</div>
         <h2 className="auth-title">Welcome back</h2>
         <p className="auth-sub">Log in to your account to continue</p>
 

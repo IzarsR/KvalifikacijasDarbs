@@ -2,11 +2,19 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const ffmpeg = require('fluent-ffmpeg');
+const os = require('os');
+const { spawn } = require('child_process');
 
+const ffmpegPath = require('ffmpeg-static');
 const router = express.Router();
 const db = require('../config/database');
 const requireAuth = require('../middleware/auth');
+
+// Use temp directory for clips (avoids Cyrillic character issues)
+const tempClipsDir = path.join(os.tmpdir(), 'playlytic_clips');
+if (!fs.existsSync(tempClipsDir)) {
+  fs.mkdirSync(tempClipsDir, { recursive: true });
+}
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, '../uploads');
@@ -101,19 +109,25 @@ async function ensureSchema() {
 
   await addIndexIfMissing('CREATE INDEX idx_videos_session_user ON videos (session_id, user_id)');
 
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS clips (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      video_id INT NULL,
-      user_id INT NULL,
-      session_id VARCHAR(255) NOT NULL,
-      label VARCHAR(255) NOT NULL,
-      start_time DECIMAL(10,3) NOT NULL,
-      end_time DECIMAL(10,3) NOT NULL,
-      file_path VARCHAR(500),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS clips (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        video_id INT NULL,
+        user_id INT NULL,
+        session_id VARCHAR(255) NOT NULL,
+        label VARCHAR(255) NOT NULL,
+        start_time DECIMAL(10,3) NOT NULL,
+        end_time DECIMAL(10,3) NOT NULL,
+        file_path VARCHAR(500),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('✓ Clips table created or already exists');
+  } catch (error) {
+    console.error('Error creating clips table:', error.message);
+    throw error;
+  }
 
   await addIndexIfMissing('CREATE INDEX idx_clips_session_user ON clips (session_id, user_id)');
   await addIndexIfMissing('CREATE INDEX idx_clips_video ON clips (video_id)');
@@ -156,20 +170,49 @@ async function removeSessionVideo(sessionId, userId) {
 // Helper function to extract a clip from a video
 function extractClip(inputPath, outputPath, startTime, endTime) {
   return new Promise((resolve, reject) => {
+    // Ensure clips directory exists
+    const clipsParentDir = path.dirname(outputPath);
+    if (!fs.existsSync(clipsParentDir)) {
+      fs.mkdirSync(clipsParentDir, { recursive: true });
+    }
+
     const duration = Math.max(0, endTime - startTime);
     
-    ffmpeg(inputPath)
-      .setStartTime(startTime)
-      .duration(duration)
-      .output(outputPath)
-      .outputOptions('-c:v copy', '-c:a copy') // Copy streams without re-encoding for speed
-      .on('end', () => {
+    // FFmpeg command: extract clip without re-encoding
+    const args = [
+      '-i', inputPath,
+      '-ss', String(startTime),
+      '-t', String(duration),
+      '-c:v', 'copy',
+      '-c:a', 'copy',
+      '-y',  // Overwrite output file
+      outputPath
+    ];
+
+    console.log(`FFmpeg: extracting clip from ${inputPath} -> ${outputPath} (${startTime}s to ${endTime}s)`);
+
+    const ffmpegProcess = spawn(ffmpegPath, args);
+
+    let stderrData = '';
+    ffmpegProcess.stderr.on('data', (data) => {
+      stderrData += data.toString();
+    });
+
+    ffmpegProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log('FFmpeg extraction successful');
         resolve(outputPath);
-      })
-      .on('error', (err) => {
-        reject(err);
-      })
-      .run();
+      } else {
+        const error = new Error(`FFmpeg failed with code ${code}: ${stderrData}`);
+        console.error('FFmpeg error:', error.message);
+        reject(error);
+      }
+    });
+
+    ffmpegProcess.on('error', (err) => {
+      console.error('FFmpeg process error:', err.message);
+      reject(err);
+    });
   });
 }
 
@@ -303,7 +346,7 @@ router.post('/session/:sessionId/clips', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Add a video to this session before creating clips.' });
     }
 
-    // Extract the clip using FFmpeg
+    // Extract the clip using FFmpeg to persistent clips directory
     const inputPath = path.join(uploadsDir, video.filename);
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
@@ -317,7 +360,7 @@ router.post('/session/:sessionId/clips', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'Failed to extract clip. Please ensure FFmpeg is installed.' });
     }
 
-    // Store clip metadata in database with file path
+    // Store clip metadata with persistent uploads path
     const clipPath = `/uploads/clips/${clipFilename}`;
     const [result] = await db.query(
       'INSERT INTO clips (video_id, user_id, session_id, label, start_time, end_time, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -356,10 +399,11 @@ router.delete('/clips/:clipId', requireAuth, async (req, res) => {
       [req.params.clipId, req.user.userId]
     );
 
-    // Delete file from disk if it exists
+    // Delete file from disk if it exists (supports both old temp path and current uploads path)
     if (clip.file_path) {
       const filename = path.basename(clip.file_path);
-      const filePath = path.join(clipsDir, filename);
+      const baseDir = clip.file_path.includes('/temp-clip/') ? tempClipsDir : clipsDir;
+      const filePath = path.join(baseDir, filename);
       if (fs.existsSync(filePath)) {
         try {
           fs.unlinkSync(filePath);
@@ -373,6 +417,27 @@ router.delete('/clips/:clipId', requireAuth, async (req, res) => {
   } catch (error) {
     console.error('Error removing clip:', error);
     res.status(500).json({ error: 'Failed to remove clip.' });
+  }
+});
+
+// Backward-compatibility route for clips created while temp path storage was enabled.
+router.get('/temp-clip/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return res.status(400).json({ error: 'Invalid filename.' });
+    }
+
+    const filePath = path.join(tempClipsDir, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Clip not found.' });
+    }
+
+    res.setHeader('Content-Type', 'video/mp4');
+    return res.sendFile(filePath);
+  } catch (error) {
+    console.error('Error serving temp clip:', error);
+    return res.status(500).json({ error: 'Failed to fetch clip.' });
   }
 });
 
@@ -409,5 +474,8 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to add video.' });
   }
 });
+
+// Clips are stored in /uploads/clips and served by the static /uploads route.
+// Older clips using /api/videos/temp-clip/:filename are still supported above.
 
 module.exports = router;

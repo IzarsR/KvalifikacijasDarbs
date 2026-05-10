@@ -4,7 +4,10 @@ const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const db      = require('../config/database');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'playlytic_secret_change_in_production';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_fallback_change_me';
+if (!process.env.JWT_SECRET) {
+  console.warn('Warning: JWT_SECRET not set — using development fallback secret. Set JWT_SECRET in production.');
+}
 const SALT_ROUNDS = 12;
 
 function checkPasswordStrength(password) {

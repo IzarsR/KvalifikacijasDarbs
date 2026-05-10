@@ -1,29 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faFolder, faVideo } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../context/AuthContext';
+import { VIDEOS_API_URL, withApiBaseUrl } from '../config/api';
 import './Dashboard.css';
-
-const API = 'http://localhost:5000/api/videos';
-
-async function saveVideoToDB(sessionId, url, token) {
-  try {
-    const response = await fetch(`${API}/session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        session_id: String(sessionId),
-        url,
-        title: url,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error('Failed to save video URL.');
-    }
-    return response.json();
-  } catch (e) {
-    console.warn('Could not save video to DB:', e);
-    throw e;
-  }
-}
 
 async function uploadVideoToDB(sessionId, file, token) {
   try {
@@ -32,7 +12,7 @@ async function uploadVideoToDB(sessionId, file, token) {
     payload.append('title', file.name);
     payload.append('video', file);
 
-    const response = await fetch(`${API}/session/upload`, {
+    const response = await fetch(`${VIDEOS_API_URL}/session/upload`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: payload,
@@ -51,7 +31,7 @@ async function uploadVideoToDB(sessionId, file, token) {
 
 async function removeVideoFromDB(sessionId, token) {
   try {
-    const response = await fetch(`${API}/session/${sessionId}`, {
+    const response = await fetch(`${VIDEOS_API_URL}/session/${sessionId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -66,7 +46,7 @@ async function removeVideoFromDB(sessionId, token) {
 
 async function fetchSessionVideoFromDB(sessionId, token) {
   try {
-    const response = await fetch(`${API}/session/${sessionId}`, {
+    const response = await fetch(`${VIDEOS_API_URL}/session/${sessionId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) return null;
@@ -79,7 +59,7 @@ async function fetchSessionVideoFromDB(sessionId, token) {
 
 async function fetchSessionClipsFromDB(sessionId, token) {
   try {
-    const response = await fetch(`${API}/session/${sessionId}/clips`, {
+    const response = await fetch(`${VIDEOS_API_URL}/session/${sessionId}/clips`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) return [];
@@ -93,7 +73,7 @@ async function fetchSessionClipsFromDB(sessionId, token) {
 
 async function saveClipToDB(sessionId, clip, token) {
   try {
-    const response = await fetch(`${API}/session/${sessionId}/clips`, {
+    const response = await fetch(`${VIDEOS_API_URL}/session/${sessionId}/clips`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -119,7 +99,7 @@ async function saveClipToDB(sessionId, clip, token) {
 
 async function removeClipFromDB(clipId, token) {
   try {
-    const response = await fetch(`${API}/clips/${clipId}`, {
+    const response = await fetch(`${VIDEOS_API_URL}/clips/${clipId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -133,24 +113,6 @@ async function removeClipFromDB(clipId, token) {
 }
 
 const STORAGE_KEY = (username) => `playlytic_sessions_${username}`;
-
-function toYouTubeEmbed(url) {
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes('youtube.com')) {
-      const v = u.searchParams.get('v');
-      if (v) return `https://www.youtube.com/embed/${v}`;
-    }
-    if (u.hostname === 'youtu.be') {
-      return `https://www.youtube.com/embed${u.pathname}`;
-    }
-  } catch {}
-  return null;
-}
-
-function isDirectVideo(url) {
-  return /\.(mp4|webm|ogg|mov|m4v)$/i.test(url.split('?')[0]) || /\/uploads\//i.test(url);
-}
 
 function sortClips(a, b) {
   if (a.start !== b.start) return a.start - b.start;
@@ -171,15 +133,20 @@ function normalizeClip(raw, idx) {
   let filePath = String(raw?.file_path || '');
   // If file path is relative, prepend the API domain
   if (filePath && filePath.startsWith('/')) {
-    filePath = 'http://localhost:5000' + filePath;
+    filePath = withApiBaseUrl(filePath);
   }
+
+  const parsedStart = Number(raw?.start_time ?? raw?.start);
+  const parsedEnd = Number(raw?.end_time ?? raw?.end);
+  const start = Number.isFinite(parsedStart) ? Number(parsedStart.toFixed(2)) : null;
+  const end = Number.isFinite(parsedEnd) ? Number(parsedEnd.toFixed(2)) : null;
 
   return {
     id: raw?.id || `local-${Date.now()}-${idx}`,
     dbId: Number.isFinite(Number(raw?.id)) ? Number(raw.id) : null,
     label: String(raw?.label || `Clip ${idx + 1}`),
-    start: raw?.start_time ? Number(raw.start_time.toFixed(2)) : null,
-    end: raw?.end_time ? Number(raw.end_time.toFixed(2)) : null,
+    start,
+    end,
     filePath: filePath,
   };
 }
@@ -192,14 +159,14 @@ function normalizeSession(raw) {
   let videoUrl = String(raw?.videoUrl || '');
   // If URL is relative (local upload), prepend the API domain
   if (videoUrl.startsWith('/')) {
-    videoUrl = 'http://localhost:5000' + videoUrl;
+    videoUrl = withApiBaseUrl(videoUrl);
   }
 
   return {
     id: raw?.id,
     name: String(raw?.name || 'Untitled session'),
     videoUrl: videoUrl,
-    videoSourceType: raw?.videoSourceType === 'upload' ? 'upload' : 'url',
+    videoSourceType: 'upload',
     clips,
   };
 }
@@ -227,7 +194,7 @@ function emptySession(name) {
     id: Date.now(),
     name,
     videoUrl: '',
-    videoSourceType: 'url',
+    videoSourceType: 'upload',
     clips: [],
   };
 }
@@ -240,8 +207,6 @@ function Dashboard() {
   const [addingSession, setAdding]    = useState(false);
   const [newName, setNewName]         = useState('');
   const [editingName, setEditingName] = useState(false);
-  const [videoInput, setVideoInput]         = useState('');
-  const [showVideoInput, setShowVideoInput]   = useState(false);
   const [videoStatus, setVideoStatus] = useState('');
   const [videoError, setVideoError] = useState('');
   const [uploadingVideo, setUploadingVideo] = useState(false);
@@ -262,6 +227,21 @@ function Dashboard() {
   const videoRef = useRef(null);
 
   useEffect(() => { saveSessions(sessions, username); }, [sessions, username]);
+
+  // When username changes (login/logout), reload sessions for that user
+  useEffect(() => {
+    setSessions(loadSessions(username));
+    // clear active selection; will be auto-picked below if sessions exist
+    setActiveId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [username]);
+
+  // Auto-select a session when sessions are available and none selected
+  useEffect(() => {
+    if (!activeId && sessions && sessions.length > 0) {
+      setActiveId(sessions[0].id);
+    }
+  }, [sessions, activeId]);
 
   useEffect(() => {
     if (editingName && nameInputRef.current) nameInputRef.current.focus();
@@ -305,47 +285,6 @@ function Dashboard() {
     ));
   }
 
-  async function handleSaveVideoUrl(e) {
-    e.preventDefault();
-    const trimmed = videoInput.trim();
-    if (!trimmed) {
-      setVideoError('Paste a video URL first.');
-      return;
-    }
-
-    setVideoError('');
-    setVideoStatus('Saving video URL...');
-
-    updateActiveSession((session) => ({
-      ...session,
-      videoUrl: trimmed,
-      videoSourceType: 'url',
-      clips: [],
-    }));
-
-    setShowVideoInput(false);
-    setVideoInput('');
-    setClipLabel('');
-    setClipStart('0');
-    setClipEnd('');
-
-    try {
-      const response = await saveVideoToDB(activeId, trimmed, token);
-      let responseUrl = response?.video?.url || trimmed;
-      // If URL is relative (local upload), prepend the API domain
-      if (responseUrl.startsWith('/')) {
-        responseUrl = 'http://localhost:5000' + responseUrl;
-      }
-      updateActiveSession((session) => ({
-        ...session,
-        videoUrl: responseUrl,
-        videoSourceType: response?.video?.source_type || 'url',
-      }));
-      setVideoStatus('Video URL saved.');
-    } catch {
-      setVideoStatus('Video saved locally. Backend sync failed.');
-    }
-  }
 
   async function handleUploadFromDevice(event) {
     const file = event.target.files?.[0];
@@ -362,7 +301,7 @@ function Dashboard() {
       
       // If URL is relative (local upload), prepend the API domain
       if (uploadedUrl.startsWith('/')) {
-        uploadedUrl = 'http://localhost:5000' + uploadedUrl;
+        uploadedUrl = withApiBaseUrl(uploadedUrl);
       }
 
       updateActiveSession((session) => ({
@@ -372,8 +311,6 @@ function Dashboard() {
         clips: [],
       }));
 
-      setShowVideoInput(false);
-      setVideoInput('');
       setClipLabel('');
       setClipStart('0');
       setClipEnd('');
@@ -390,7 +327,7 @@ function Dashboard() {
     updateActiveSession((session) => ({
       ...session,
       videoUrl: '',
-      videoSourceType: 'url',
+      videoSourceType: 'upload',
       clips: [],
     }));
 
@@ -484,6 +421,7 @@ function Dashboard() {
                   label: created.label,
                   start: Number(created.start_time),
                   end: Number(created.end_time),
+                  filePath: created.file_path ? withApiBaseUrl(created.file_path) : null,
                 }
               : clip
           ))
@@ -523,8 +461,6 @@ function Dashboard() {
   }
 
   useEffect(() => {
-    setShowVideoInput(false);
-    setVideoInput('');
     setVideoStatus('');
     setVideoError('');
     setClipLabel('');
@@ -559,20 +495,21 @@ function Dashboard() {
             let videoUrl = videoPayload.video.url;
             // If URL is relative (local upload), prepend the API domain
             if (videoUrl.startsWith('/')) {
-              videoUrl = 'http://localhost:5000' + videoUrl;
+              videoUrl = withApiBaseUrl(videoUrl);
             }
             merged.videoUrl = videoUrl;
-            merged.videoSourceType = videoPayload.video.source_type || 'url';
+            merged.videoSourceType = 'upload';
           }
 
-          if (merged.clips.length === 0 && clipRows.length > 0) {
+          if (clipRows.length > 0) {
             merged.clips = clipRows
               .map((clip, idx) => normalizeClip({
                 id: `db-${clip.id}`,
                 dbId: clip.id,
                 label: clip.label,
-                start: clip.start_time,
-                end: clip.end_time,
+                start_time: clip.start_time,
+                end_time: clip.end_time,
+                file_path: clip.file_path,
               }, idx))
               .filter(Boolean)
               .sort(sortClips);
@@ -590,13 +527,11 @@ function Dashboard() {
     };
   }, [activeId, token]);
 
-  const ytEmbed = activeSession?.videoUrl ? toYouTubeEmbed(activeSession.videoUrl) : null;
   const directUrl = (
     activeSession?.videoUrl
-    && !ytEmbed
-    && (activeSession.videoSourceType === 'upload' || isDirectVideo(activeSession.videoUrl))
+    && activeSession.videoSourceType === 'upload'
   ) ? activeSession.videoUrl : null;
-  const hasVideo = Boolean(ytEmbed || directUrl);
+  const hasVideo = Boolean(directUrl);
 
   return (
     <div className="dashboard">
@@ -629,7 +564,7 @@ function Dashboard() {
                 className={`db-session-item${activeId === s.id ? ' active' : ''}`}
                 onClick={() => { setActiveId(s.id); setEditingName(false); }}
               >
-                <span className="db-session-icon">{activeId === s.id ? '📂' : '📁'}</span>
+                <span className="db-session-icon"><FontAwesomeIcon icon={faFolder} /></span>
                 <span className="db-session-item-name">{s.name}</span>
                 <button
                   className="db-delete-btn"
@@ -653,7 +588,7 @@ function Dashboard() {
                             if (window.innerWidth <= 760) setSidebarOpen(false);
                           }}
                         >
-                          <span className="db-sidebar-clip-icon">🎬</span>
+                          <span className="db-sidebar-clip-icon"><FontAwesomeIcon icon={faVideo} /></span>
                           <span className="db-sidebar-clip-label">{clip.label}</span>
                           <span className="db-sidebar-clip-time">{formatTime(clip.start)}</span>
                         </li>
@@ -722,111 +657,61 @@ function Dashboard() {
             </div>
 
             <div className="db-content-row">
+              <div className="db-video-area">
+                {hasVideo ? (
+                  <video
+                    ref={videoRef}
+                    className="db-video-player"
+                    controls
+                    crossOrigin="anonymous"
+                    src={directUrl}
+                    onTimeUpdate={() => {
+                      if (!videoRef.current) return;
+                      setVideoCurrent(videoRef.current.currentTime || 0);
+                    }}
+                    onLoadedMetadata={() => {
+                      if (!videoRef.current) return;
+                      setVideoDuration(videoRef.current.duration || 0);
+                    }}
+                    onError={(e) => {
+                      console.error('Video error:', e);
+                      setVideoError('Video failed to load. Check console for details.');
+                    }}
+                  />
+                ) : (
+                  <div className="db-video-empty">
+                    <span className="db-play-icon"></span>
+                    <span className="db-video-add-label">Add a video to start clipping</span>
+                    <span className="db-video-sub">Upload a downloaded file to start clipping</span>
+                  </div>
+                )}
 
-                <div className="db-video-area">
-                  {hasVideo ? (
-                    <>
-                      {ytEmbed && (
-                        <iframe
-                          className="db-video-player"
-                          src={ytEmbed}
-                          title="Video"
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      )}
-                      {directUrl && (
-                        <video
-                          ref={videoRef}
-                          className="db-video-player"
-                          controls
-                          crossOrigin="anonymous"
-                          src={directUrl}
-                          onTimeUpdate={() => {
-                            if (!videoRef.current) return;
-                            setVideoCurrent(videoRef.current.currentTime || 0);
-                          }}
-                          onLoadedMetadata={() => {
-                            if (!videoRef.current) return;
-                            setVideoDuration(videoRef.current.duration || 0);
-                          }}
-                          onError={(e) => {
-                            console.error('Video error:', e);
-                            setVideoError('Video failed to load. Check console for details.');
-                          }}
-                        />
-                      )}
-                    </>
-                  ) : (
-                    <div className="db-video-empty">
-                      <span className="db-play-icon"></span>
-                      <span className="db-video-add-label">Add a video to start clipping</span>
-                      <span className="db-video-sub">Use YouTube/direct URL or upload a downloaded file</span>
-                    </div>
-                  )}
+                <div className="db-video-toolbar">
+                  <label className="db-upload-btn">
+                    {uploadingVideo ? 'Uploading...' : 'Upload file'}
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleUploadFromDevice}
+                      disabled={uploadingVideo}
+                    />
+                  </label>
 
-                  <div className="db-video-toolbar">
+                  {hasVideo && (
                     <button
                       type="button"
-                      className="db-ghost-btn"
-                      onClick={() => setShowVideoInput((prev) => !prev)}
+                      className="db-remove-video"
+                      onClick={handleRemoveVideo}
+                      title="Remove video"
                     >
-                      {showVideoInput ? 'Close URL form' : 'Paste URL'}
+                      Remove video
                     </button>
-
-                    <label className="db-upload-btn">
-                      {uploadingVideo ? 'Uploading...' : 'Upload file'}
-                      <input
-                        type="file"
-                        accept="video/*"
-                        onChange={handleUploadFromDevice}
-                        disabled={uploadingVideo}
-                      />
-                    </label>
-
-                    {hasVideo && (
-                      <button
-                        type="button"
-                        className="db-remove-video"
-                        onClick={handleRemoveVideo}
-                        title="Remove video"
-                      >
-                        Remove video
-                      </button>
-                    )}
-                  </div>
-
-                  {showVideoInput && (
-                    <div className="db-video-prompt">
-                      <form className="db-video-url-form" onSubmit={handleSaveVideoUrl}>
-                        <input
-                          autoFocus
-                          type="text"
-                          className="db-video-url-input"
-                          placeholder="Paste YouTube or direct video URL..."
-                          value={videoInput}
-                          onChange={e => setVideoInput(e.target.value)}
-                        />
-                        <button type="submit" className="db-video-confirm-btn">Save URL</button>
-                        <button
-                          type="button"
-                          className="db-cancel-btn"
-                          onClick={() => {
-                            setShowVideoInput(false);
-                            setVideoInput('');
-                            setVideoError('');
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </form>
-                    </div>
                   )}
-
-                  {videoStatus && <p className="db-video-note">{videoStatus}</p>}
-                  {videoError && <p className="db-video-note db-video-note--error">{videoError}</p>}
                 </div>
+
+                {videoStatus && <p className="db-video-note">{videoStatus}</p>}
+                {videoError && <p className="db-video-note db-video-note--error">{videoError}</p>}
+              </div>
 
                 <aside className="db-clips-sidebar">
                   <div className="db-clips-header">

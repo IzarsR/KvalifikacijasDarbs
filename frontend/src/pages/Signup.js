@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { AUTH_API_URL } from '../config/api';
 import './Login.css';
 
 function getStrengthRules(password) {
@@ -35,7 +36,7 @@ function Signup() {
 
     setLoading(true);
     try {
-      const res  = await fetch('http://localhost:5000/api/auth/signup', {
+      const res  = await fetch(`${AUTH_API_URL}/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password }),

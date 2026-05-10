@@ -1,36 +1,108 @@
 /* ── NAVBAR - sits at the top of every page ── */
 .navigation {
-  background-color: #0d0d18;
+  background-color: #ffffff;
   padding: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border: none;
   position: sticky;
-  top: 0;
+  top: 16px;
   z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  margin: 0 auto;
+  width: 60%;
+  overflow: hidden;
 }
+
+/* ornaments will be small absolutely-positioned elements inside .nav-container */
+.nav-ornament {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.18;
+  pointer-events: none;
+  filter: grayscale(1) contrast(1.05);
+  z-index: 0;
+  transform: rotate(0deg);
+}
+.nav-ornament--left { transform: rotate(-9deg); }
+.nav-ornament--right { transform: rotate(9deg); }
 
 .nav-container {
   max-width: 100%;
-  margin: 0;
+  margin: 0 auto;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  padding: 0 8%;
-  height: 85px;
+  padding: 0 20px;
+  height: 70px;
+  gap: 18px;
+  position: relative;
+  z-index: 1;
 }
+
+.nav-left,
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 0;
+}
+
+.nav-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.nav-left { justify-content: flex-start; }
+.nav-right { justify-content: flex-end; }
 
 .nav-logo {
   font-size: 1.3rem;
   font-weight: 900;
   letter-spacing: 1px;
-  color: #ffffff;
+  color: #1a1a1a;
   text-decoration: none;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  width: fit-content;
+  height: fit-content;
 }
 
 .nav-logo span {
-  color: #e63946;
+  color: #1a1a1a;
+}
+
+.nav-time-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 80px;
+}
+
+.nav-time {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.nav-date {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .nav-links {
@@ -47,111 +119,116 @@
 }
 
 .nav-links a {
-  color: #b0b0c8;
+  color: #4a4a4a;
   text-decoration: none;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
   padding: 8px 14px;
   border-radius: 6px;
   transition: color 0.2s, background 0.2s;
 }
 .nav-links a:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
+  color: #1a1a1a;
+  background: rgba(0, 0, 0, 0.04);
 }
 
-.nav-btn-outline {
-  --b: 2px;
-  --s: .32em;
-  --color: #f0f0f5;
-  
-  color: #f0f0f5 !important;
-  background:
-    conic-gradient(from 90deg at var(--b) var(--b),#0000 90deg,var(--color) 0)
-    var(--_p) var(--_p)/calc(100% - var(--b) - 2*var(--_p)) calc(100% - var(--b) - 2*var(--_p)) !important;
-  --_p: var(--s);
-  border: none !important;
-  padding: calc(.5em + var(--s)) calc(1.1em + var(--s)) !important;
-  cursor: pointer;
-  transition: .3s linear, color 0s;
-  outline: var(--b) solid #0000;
-  outline-offset: .5em;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-}
-.nav-btn-outline:hover {
-  --_p: 0px;
-  outline-color: var(--color) !important;
-  outline-offset: .05em;
+.nav-action {
+  --color: #b0b0c8;
+  color: #b0b0c8 !important;
 }
 
-.nav-btn-primary {
-  --b: 2px;
-  --s: .32em;
+.nav-cta {
   --color: #e63946;
-  
-  background:
-    conic-gradient(from 90deg at var(--b) var(--b),#0000 90deg,var(--color) 0)
-    var(--_p) var(--_p)/calc(100% - var(--b) - 2*var(--_p)) calc(100% - var(--b) - 2*var(--_p)) !important;
+  color: #e63946 !important;
+}
+
+.nav-action,
+.nav-cta {
+  --b: 1px;
+  --s: .4em;
+  display: inline-block;
+  padding: calc(.6em + var(--s)) calc(1em + var(--s)) !important;
   --_p: var(--s);
-  color: #ffffff !important;
-  border: none !important;
-  padding: calc(.5em + var(--s)) calc(1.1em + var(--s)) !important;
-  font-weight: 700 !important;
-  cursor: pointer;
+  background:
+    conic-gradient(from 90deg at var(--b) var(--b), #0000 90deg, var(--color) 0)
+    var(--_p) var(--_p) / calc(100% - var(--b) - 2 * var(--_p)) calc(100% - var(--b) - 2 * var(--_p)) !important;
   transition: .3s linear, color 0s, background-color 0s;
   outline: var(--b) solid #0000;
   outline-offset: .6em;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: manipulation;
-}
-.nav-btn-primary:hover {
-  --_p: 0px;
-  outline-color: var(--color) !important;
-  outline-offset: .05em;
-}
-.nav-btn-primary:active {
-  background: var(--color) !important;
-  color: #ffffff !important;
-}
-
-.nav-username {
-  color: #b0b0c8;
-  font-size: 0.85rem;
-  font-weight: 500;
-  padding: 8px 10px;
-}
-
-.nav-logout-btn {
-  --b: 2px;
-  --s: .3em;
-  --color: #f0f0f5;
-  
-  background:
-    conic-gradient(from 90deg at var(--b) var(--b),#0000 90deg,var(--color) 0)
-    var(--_p) var(--_p)/calc(100% - var(--b) - 2*var(--_p)) calc(100% - var(--b) - 2*var(--_p));
-  --_p: var(--s);
-  color: #f0f0f5;
-  border: none;
-  font-family: inherit;
   font-size: 0.9rem;
-  font-weight: 500;
-  padding: calc(.5em + var(--s)) calc(.9em + var(--s));
+  font-weight: 700 !important;
+  letter-spacing: 0.03em;
+  text-decoration: none;
   cursor: pointer;
-  transition: .3s linear, color 0s;
-  outline: var(--b) solid #0000;
-  outline-offset: .5em;
+  border: 0;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
+  border-radius: 0 !important;
 }
-.nav-logout-btn:hover {
+
+.nav-action:hover,
+.nav-action:focus-visible,
+.nav-cta:hover,
+.nav-cta:focus-visible {
   --_p: 0px;
   outline-color: var(--color);
   outline-offset: .05em;
-  color: #ffffff;
+}
+
+.nav-action:hover,
+.nav-action:focus-visible {
+  color: #b0b0c8 !important;
+}
+
+.nav-action:active,
+.nav-cta:active {
+  background: var(--color) !important;
+  color: #fff !important;
+}
+
+.nav-ornament {
+  width: 34px;
+  height: 34px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.18;
+  pointer-events: none;
+  filter: grayscale(1) contrast(1.05);
+  z-index: 0;
+}
+.nav-ornament--left { transform: translateY(0px) rotate(-9deg); }
+.nav-ornament--right { transform: translateY(0px) rotate(9deg); }
+
+.nav-logout-btn {
+  background: transparent;
+  color: #ef4444;
+  border: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  border-radius: 6px;
+}
+.nav-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+/* Remove unwanted browser focus ring for nav interactive elements (visual-only tweak) */
+.navigation a:focus,
+.navigation button:focus,
+.navigation a:focus-visible,
+.navigation button:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 /* ── HAMBURGER BUTTON ── */
@@ -170,7 +247,7 @@
   display: block;
   width: 24px;
   height: 2px;
-  background: #f0f0f5;
+  background: #1a1a1a;
   border-radius: 2px;
   transition: transform 0.25s ease, opacity 0.25s ease;
   transform-origin: center;
@@ -191,6 +268,11 @@
 
 /* ── MOBILE STYLES ── */
 @media (max-width: 680px) {
+  .navigation::before,
+  .navigation::after {
+    display: none;
+  }
+
   .nav-hamburger { display: flex; }
   .nav-overlay { display: block; }
 
@@ -200,8 +282,8 @@
     right: -280px;
     width: 260px;
     height: 100vh;
-    background: #0d0d18;
-    border-left: 1px solid rgba(255,255,255,0.08);
+    background: #ffffff;
+    border-left: 1px solid #e5e5e5;
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
@@ -219,12 +301,6 @@
     width: 100%;
     box-sizing: border-box;
     display: block;
-  }
-
-  .nav-btn-outline,
-  .nav-btn-primary {
-    width: 100%;
-    text-align: center;
   }
 
   .nav-logout-btn {

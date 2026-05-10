@@ -1,0 +1,86 @@
+/* ── DASHBOARD NAV ── */
+.dashboard-nav {
+  height: 85px;
+  background: #0d0d18;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.dash-nav-container {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.dash-nav-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: #f0f0f5;
+  flex-shrink: 0;
+}
+
+.dash-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.dash-nav-username {
+  font-size: 0.9rem;
+  color: #8080a8;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dash-nav-logout {
+  padding: 8px 16px;
+  background: rgba(230, 57, 70, 0.1);
+  border: 1px solid rgba(230, 57, 70, 0.3);
+  border-radius: 6px;
+  color: #e63946;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dash-nav-logout:hover {
+  background: rgba(230, 57, 70, 0.2);
+  border-color: rgba(230, 57, 70, 0.5);
+}
+
+.dash-nav-logout:active {
+  transform: scale(0.98);
+}
+
+/* Responsive */
+@media (max-width: 760px) {
+  .dashboard-nav {
+    padding: 0 12px;
+    height: 70px;
+  }
+
+  .dash-nav-container {
+    gap: 12px;
+  }
+
+  .dash-nav-username {
+    font-size: 0.8rem;
+  }
+
+  .dash-nav-logout {
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+}

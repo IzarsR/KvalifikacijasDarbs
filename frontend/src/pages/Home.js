@@ -1,19 +1,54 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
 import Carousel from '../components/Carousel';
+import { CONTACT_API_URL } from '../config/api';
 import './Home.css';
 
 function Home() {
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [contactStatus, setContactStatus] = useState('');
+  const [contactError, setContactError] = useState('');
+  const [submittingContact, setSubmittingContact] = useState(false);
+
   const carouselFeatures = [
     { name: "Fast Clipping" },
     { name: "Organized Sessions" },
     { name: "Team Collaboration" }
   ];
 
-  const handleContactSubmit = (e) => {
+  const handleContactSubmit = async (e) => {
     e.preventDefault();
-    // Add your form submission logic here
-    alert('Thanks for reaching out! We\'ll get back to you soon.');
+
+    setContactStatus('');
+    setContactError('');
+    setSubmittingContact(true);
+
+    try {
+      const response = await fetch(CONTACT_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: contactName,
+          email: contactEmail,
+          message: contactMessage,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message.');
+      }
+
+      setContactStatus(data.message || 'Thanks for reaching out! We\'ll get back to you soon.');
+      setContactName('');
+      setContactEmail('');
+      setContactMessage('');
+    } catch (error) {
+      setContactError(error.message || 'Could not send message.');
+    } finally {
+      setSubmittingContact(false);
+    }
   };
 
   return (
@@ -27,11 +62,6 @@ function Home() {
           <span className="hero-deco-word">ANALYSE</span>
           <span className="hero-deco-word">IMPROVE</span>
           <span className="hero-deco-word">WIN</span>
-          <div className="hero-actions">
-            <Link to="/signup" className="hbtn hbtn-primary">Start for free</Link>
-            <Link to="/login" className="hbtn hbtn-ghost">Sign in</Link>
-            <a href="#about" className="hbtn hbtn-learn">Learn more</a>
-          </div>
         </div>
       </section>
 
@@ -88,61 +118,6 @@ function Home() {
                 <img src="/images/PlayersImage.jpg" alt="Players" className="usecase-image" />
                 <h4 className="usecase-role">Players</h4>
                 <p className="usecase-text">Review your performance, learn from mistakes, and improve your game.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CONTACT SECTION ── */}
-      <section id="contact" className="contact-section">
-        <div className="contact-inner">
-          <div className="contact-header">
-            <h2 className="contact-title">Get in touch with us</h2>
-            <p className="contact-subtitle">Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.</p>
-          </div>
-
-          <div className="contact-content">
-            <form className="contact-form" onSubmit={handleContactSubmit}>
-              <div className="form-group">
-                <input
-                  type="text"
-                  placeholder="Your name"
-                  className="form-input"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <input
-                  type="email"
-                  placeholder="Your email"
-                  className="form-input"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <textarea
-                  placeholder="Your message"
-                  className="form-textarea"
-                  rows="5"
-                  required
-                ></textarea>
-              </div>
-              <button type="submit" className="contact-btn">Send message</button>
-            </form>
-
-            <div className="contact-info">
-              <div className="info-item">
-                <h4 className="info-title">Email</h4>
-                <p className="info-text">hello@playlytic.com</p>
-              </div>
-              <div className="info-item">
-                <h4 className="info-title">Address</h4>
-                <p className="info-text">Riga, Latvia</p>
-              </div>
-              <div className="info-item">
-                <h4 className="info-title">Response time</h4>
-                <p className="info-text">Usually within 24 hours</p>
               </div>
             </div>
           </div>
